@@ -27,4 +27,16 @@ public class Protocol {
 	public final static String JOIN_TOKEN = "JOIN";
 	public final static String REBALANCE_STORE_TOKEN = "REBALANCE_STORE";
 	public final static String REBALANCE_COMPLETE_TOKEN = "REBALANCE_COMPLETE";
+
+  public final static Integer STORE_COMPLETE = 2;
+  public final static Integer STORE_IN_PROGRESS = 1;
+  public final static Integer REMOVE_IN_PROGRESS = -1;
+  public final static Integer REMOVE_COMPLETE = -2;
+
+  /**
+   * 2=STORE_COMPLETE
+   * 1=STORE_IN_PROGRESS
+   * -1=REMOVE_IN_PROGRESS
+   * -2=REMOVE_COMPLETE
+   */
 }

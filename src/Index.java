@@ -4,14 +4,14 @@ import java.util.HashMap;
 public class Index {
 
   ArrayList<String> files;
-  HashMap<String, String> fileStats;
+  HashMap<String, Integer> fileStats;
 
   /**
    * Constructor for Index
    * @param files
    * @param fileStats
    */
-  public Index(ArrayList<String> files, HashMap<String, String> fileStats) {
+  public Index(ArrayList<String> files, HashMap<String, Integer> fileStats) {
     this.files = files;
     this.fileStats = fileStats;
   }
@@ -36,7 +36,7 @@ public class Index {
    * Getter for fileStats
    * @return fileStats
    */
-  public HashMap<String, String> getFileStats() {
+  public HashMap<String, Integer> getFileStats() {
     return fileStats;
   }
 
@@ -44,8 +44,17 @@ public class Index {
    * Setter for fileStats
    * @param fileStats
    */
-  public void setFileStats(HashMap<String, String> fileStats) {
+  public void setFileStats(HashMap<String, Integer> fileStats) {
     this.fileStats = fileStats;
+  }
+
+  /**
+   * Clears the index
+   * Ready for next cycle
+   */
+  public void clear(){
+    this.files.clear();
+    this.fileStats.clear();
   }
 
 }
