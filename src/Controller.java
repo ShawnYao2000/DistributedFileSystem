@@ -174,6 +174,9 @@ class Controller {
                         if (sufficientDS(out) && index.files.contains(contents[1])){
                           removeFilePW.put(contents[1], out);
                           clientHandler.handleRemoveRequest(out, contents[1]);
+                        } else {
+                          out.println("ERROR_FILE_DOES_NOT_EXIST");
+                          controllerLogger.info("ERROR_FILE_DOES_NOT_EXIST" + " -> [" + cport + "]");
                         }
                         break;
 
