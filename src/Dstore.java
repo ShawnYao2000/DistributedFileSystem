@@ -90,7 +90,7 @@ public class Dstore {
                       break;
                     case Protocol.ACK_TOKEN:
                       dStoreLogger.info("[" + port + "] <- " + "[" + cport + "] : ACK");
-                      sendFileContent(clientWriter);
+                      writeFileContent(clientWriter);
                       break;
                     default:
                       dStoreLogger.info("Invalid command: [" + line + "] received");
@@ -262,12 +262,13 @@ public class Dstore {
     String[] contents = commands.split(" ");
     int moved = 0;
     int counter = 1;
-    while(moved < Integer.valueOf(contents[0])){
+    int numFiles = Integer.valueOf(contents[0]);
+    while(moved < numFiles){
       String fileName = contents[counter];
       int portsNum = Integer.valueOf(contents[counter+1]);
       for(int i = 1; i <= portsNum; i++){
         int port = Integer.valueOf(contents[counter+1+i]);
-        sendFile(port, fileName);
+        writeFile(port, fileName);
       }
       moved++;
       counter = counter + portsNum + 2;
@@ -302,18 +303,18 @@ public class Dstore {
    * @param port
    * @param fileName
    */
-  private synchronized static void sendFile(Integer port, String fileName){
+  private synchronized static void writeFile(Integer port, String fileName){
     try {
       long fileSize = Files.size(Path.of(currentFolder + File.separator + fileName));
       Socket dStore = new Socket(InetAddress.getLoopbackAddress(), port);
       OutputStream out = dStore.getOutputStream();
-      PrintWriter dStorePW = new PrintWriter(out, true);
-      dStorePW.println("REBALANCE_STORE " + fileName + " " + fileSize);
+      PrintWriter printWriter = new PrintWriter(out, true);
+      printWriter.println("REBALANCE_STORE " + fileName + " " + fileSize);
       dStoreLogger.info("REBALANCE_STORE -> " + "[" + cport + "]");
       fileToSend = fileName;
-      sendFileContent(out);
+      writeFileContent(out);
     } catch (IOException e) {
-      e.printStackTrace();
+      dStoreLogger.info("Error sending file to port: " + port);
     }
   }
 
@@ -321,7 +322,7 @@ public class Dstore {
    * Method to send file content
    * @param out
    */
-  private synchronized static void sendFileContent(OutputStream out){
+  private synchronized static void writeFileContent(OutputStream out){
     dStoreLogger.info("Sending file content...");
     File file = new File(currentFolder + File.separator + fileToSend);
     try {
@@ -372,9 +373,5 @@ public class Dstore {
 
   public static String getFileToSend() {
     return fileToSend;
-  }
-
-  public static void setFileToSend(String fileToSend) {
-    Dstore.fileToSend = fileToSend;
   }
 }

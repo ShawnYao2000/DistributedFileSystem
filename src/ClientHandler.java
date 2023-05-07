@@ -8,10 +8,22 @@ class ClientHandler {
   private static Index index;
   static Logger handlerLogger = Logger.getLogger(ClientHandler.class.getName());
 
+  /**
+   * This class handles message from clients
+   * @param index
+   */
   public ClientHandler(Index index) {
     this.index = index;
   }
 
+  public synchronized static void updateIndex(Index index) {
+    ClientHandler.index = index;
+  }
+
+  /**
+   * handles list request from client
+   * @param printWriter
+   */
   public synchronized static void handleListRequest(PrintWriter printWriter){
     String file_names = "";
     if(index.getFiles().size() > 0) {
@@ -23,6 +35,13 @@ class ClientHandler {
     handlerLogger.info("List sent to controller");
   }
 
+  /**
+   * handles store request from client
+   * @param printWriter
+   * @param r
+   * @param fileName
+   * @param fileSize
+   */
   public synchronized static void handleStoreRequest(PrintWriter printWriter, int r, String fileName, int fileSize){
     if(index.fileStats.containsKey(fileName) && index.files.contains(fileName)){
       printWriter.println(Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN);
@@ -42,6 +61,12 @@ class ClientHandler {
     }
   }
 
+  /**
+   * handles load request from client
+   * @param printWriter
+   * @param fileName
+   * @param loadPortCounter
+   */
   public synchronized static void handleLoadRequest(PrintWriter printWriter, String fileName, int loadPortCounter){
     for(String file : Controller.filesList.keySet()){
       if(file.equals(fileName) && index.files.contains(file)){
@@ -55,6 +80,11 @@ class ClientHandler {
     }
   }
 
+  /**
+   * handles remove request from client
+   * @param printWriter
+   * @param fileName
+   */
   public synchronized static void handleRemoveRequest(PrintWriter printWriter, String fileName){
     if(index.files.contains(fileName)) {
       index.fileStats.remove(fileName);

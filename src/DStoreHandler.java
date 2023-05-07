@@ -8,10 +8,29 @@ class DStoreHandler {
   private static Index index;
   static Logger DSHandlerLogger = Logger.getLogger(ClientHandler.class.getName());
 
+  /**
+   * This class handles message from dstores
+   * @param index
+   */
   public DStoreHandler(Index index) {
     this.index = index;
   }
 
+  /**
+   * update local index
+   * @param index
+   */
+  public synchronized static void updateIndex(Index index) {
+    DStoreHandler.index = index;
+  }
+
+  /**
+   * handles store coplete from dstores
+   * @param port
+   * @param printWriter
+   * @param completed_stores
+   * @param fileName
+   */
   public synchronized static void handleStoreComplete(int port, PrintWriter printWriter, int completed_stores, String fileName) {
     if(completed_stores == Controller.r) {
       index.files.add(fileName);
@@ -39,6 +58,13 @@ class DStoreHandler {
     }
   }
 
+  /**
+   * Handles the remove complete message from dstores
+   * @param port
+   * @param printWriter
+   * @param completed_deletes
+   * @param fileName
+   */
   public synchronized static void handleRemoveComplete(int port, PrintWriter printWriter, int completed_deletes, String fileName) {
     if (completed_deletes == Controller.filesList.get(fileName).size() - 1) {
       index.files.remove(fileName);
@@ -54,7 +80,7 @@ class DStoreHandler {
     } else {
       Controller.setDeleteComplete(Controller.getDeleteComplete() + 1);
 
-      Controller.filesList.get(fileName).remove(port);
+      Controller.filesList.remove(port);
     }
   }
 }
