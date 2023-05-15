@@ -14,7 +14,7 @@ class Con {
 
 class cli{
   public static void main(String[] args) throws Exception {
-    ClientMain.main(new String[]{"4000", "1000", "to_store", "to_load"});
+    ClientApp.main(new String[]{"4000", "1000", "to_store", "to_load"});
             /*
         ClientMain.main(new String[]{"4000", "3000", "to_store", "to_load"});
         final int cport = 4000;
@@ -56,6 +56,20 @@ class ds2 {
 class ds3 {
   public static void main(String[] args) {
     Dstore.main(new String[]{"5002", "4000", "11000", "DStore3"});
+            /*
+        final int port = 5002;
+        final int cport = 4000;
+        setCport(cport);
+        final int timeout = 11000;
+        final String file_folder = "DStore3";
+        setFile_folder(file_folder);
+         */
+  }
+}
+
+class ds4 {
+  public static void main(String[] args) {
+    Dstore.main(new String[]{"5003", "4000", "11000", "DStore4"});
             /*
         final int port = 5002;
         final int cport = 4000;

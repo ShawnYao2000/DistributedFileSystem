@@ -1,7 +1,4 @@
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.logging.Logger;
 
 class DStoreHandler {
@@ -36,11 +33,11 @@ class DStoreHandler {
       index.files.add(fileName);
       DSHandlerLogger.info("Index updated with new file [" + fileName + "]");
       Controller.setCompletedStores(0);
-      if(Controller.filesList.get(fileName).contains(port)) {
+      if(Controller.filesDStores.get(fileName).contains(port)) {
         DSHandlerLogger.info("File [" + fileName + "] already exists in DStore [" + port + "]");
       } else {
-        Controller.filesList.get(fileName).add(port);
-        Controller.filesList.put(fileName, Controller.filesList.get(fileName));
+        Controller.filesDStores.get(fileName).add(port);
+        Controller.filesDStores.put(fileName, Controller.filesDStores.get(fileName));
       }
       index.fileStats.remove(fileName);
       index.fileStats.put(fileName, Protocol.STORE_COMPLETE); //index updated to "store complete"
@@ -49,11 +46,11 @@ class DStoreHandler {
       DSHandlerLogger.info("File [" + fileName + "] has been stored in DStores");
     } else {
       Controller.setCompletedStores(Controller.getCompletedStores()+1);
-      if(Controller.filesList.get(fileName).contains(port)) {
+      if(Controller.filesDStores.get(fileName).contains(port)) {
         DSHandlerLogger.info("File [" + fileName + "] already exists in DStore [" + port + "]");
       } else {
-        Controller.filesList.get(fileName).add(port);
-        Controller.filesList.put(fileName, Controller.filesList.get(fileName));
+        Controller.filesDStores.get(fileName).add(port);
+        Controller.filesDStores.put(fileName, Controller.filesDStores.get(fileName));
       }
     }
   }
@@ -66,11 +63,11 @@ class DStoreHandler {
    * @param fileName
    */
   public synchronized static void handleRemoveComplete(int port, PrintWriter printWriter, int completed_deletes, String fileName) {
-    if (completed_deletes == Controller.filesList.get(fileName).size() - 1) {
+    if (completed_deletes == Controller.filesDStores.get(fileName).size() - 1) {
       index.files.remove(fileName);
       Controller.setDeleteComplete(0);
 
-      Controller.filesList.remove(fileName);
+      Controller.filesDStores.remove(fileName);
 
       index.fileStats.remove(fileName);
       index.fileStats.put(fileName, Protocol.REMOVE_COMPLETE); //index updated to "remove complete"
@@ -80,7 +77,7 @@ class DStoreHandler {
     } else {
       Controller.setDeleteComplete(Controller.getDeleteComplete() + 1);
 
-      Controller.filesList.remove(port);
+      Controller.filesDStores.remove(port);
     }
   }
 }

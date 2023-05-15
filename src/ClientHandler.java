@@ -1,8 +1,14 @@
 import java.io.PrintWriter;
-import java.net.InetAddress;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 class ClientHandler {
   private static Index index;
@@ -49,7 +55,8 @@ class ClientHandler {
     } else {
       ArrayList<Integer> id = new ArrayList<>();
       id.add(fileSize);
-      Controller.filesList.put(fileName, id);
+      Controller.filesDStores.put(fileName, id);
+      System.out.println(Controller.filesDStores);
       index.fileStats.put(fileName, Protocol.STORE_IN_PROGRESS); //index updated to "store in progress"
       handlerLogger.info("Index updated to \"Store in progress\"!");
       String ports = "";
@@ -68,10 +75,10 @@ class ClientHandler {
    * @param loadPortCounter
    */
   public synchronized static void handleLoadRequest(PrintWriter printWriter, String fileName, int loadPortCounter){
-    for(String file : Controller.filesList.keySet()){
+    for(String file : Controller.filesDStores.keySet()){
       if(file.equals(fileName) && index.files.contains(file)){
-        int fileSize = Controller.filesList.get(fileName).get(0);
-        int port = Controller.filesList.get(fileName).get(loadPortCounter);
+        int fileSize = Controller.filesDStores.get(fileName).get(0);
+        int port = Controller.filesDStores.get(fileName).get(loadPortCounter);
         handlerLogger.info("Loading file [" + fileName + "] from DStore [" + port + "]");
         printWriter.println("LOAD_FROM " + port + " " + fileSize);
       } else {
@@ -82,29 +89,21 @@ class ClientHandler {
 
   /**
    * handles remove request from client
-   * @param printWriter
+   * @param clientPrintWriter
    * @param fileName
    */
-  public synchronized static void handleRemoveRequest(PrintWriter printWriter, String fileName){
+  public synchronized static void handleRemoveRequest(PrintWriter clientPrintWriter, String fileName){
+    System.out.println("Removing file [" + fileName + "]");
     if(index.files.contains(fileName)) {
       index.fileStats.remove(fileName);
       index.files.remove(fileName);
       index.fileStats.put(fileName, Protocol.REMOVE_IN_PROGRESS); //remove in progress
       handlerLogger.info("Index updated to \"Remove in progress\"");
-      if (Controller.filesList.containsKey(fileName)) {
-        ArrayList<Integer> dStores = Controller.filesList.get(fileName);
-        for (int i = 1; i < dStores.size(); i++) {
-          try {
-            Socket ds = new Socket(InetAddress.getLoopbackAddress(), dStores.get(i));
-            PrintWriter dStorePW = new PrintWriter(ds.getOutputStream(), true);
-            dStorePW.println("REMOVE " + fileName);
-          } catch (Exception e) {
-            handlerLogger.info("Error removing file [" + fileName + "] from DStore [" + dStores.get(i) + "]");
-          }
-        }
+      if (Controller.filesDStores.containsKey(fileName)) {
+        Controller.sendRemoveRequest(fileName);
       }
     } else {
-      printWriter.println("ERROR_FILE_DOES_NOT_EXIST");
+      clientPrintWriter.println("ERROR_FILE_DOES_NOT_EXIST");
       handlerLogger.info("File [" + fileName + "] does not exist");
     }
   }

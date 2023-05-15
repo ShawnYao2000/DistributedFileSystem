@@ -12,7 +12,7 @@ public class Dstore {
   static String currentFileName;
   static int currentFileSize;
   static int cport;
-  static int currentPort;
+  static int port;
   static String currentFolder;
   static String fileToSend;
   static Logger dStoreLogger = Logger.getLogger(Dstore.class.getName());
@@ -152,7 +152,7 @@ public class Dstore {
     try {
       currentFileName = fileName;
       currentFileSize = fileSize;
-      printWriter.println("ACK");
+      printWriter.println(Protocol.ACK_TOKEN);
       dStoreLogger.info("ACK -> " + "[" + cport + "]");
     } catch (Exception e) {
       dStoreLogger.info("Error sending ACK");
@@ -278,7 +278,7 @@ public class Dstore {
     for(int i = 1; i <= removed; i++){
       remove(contents[reCounter+i]);
     }
-    toController.println("REBALANCE_COMPLETE");
+    toController.println(Protocol.REBALANCE_COMPLETE_TOKEN);
     dStoreLogger.info("REBALANCE_COMPLETE -> " + "[" + cport + "]");
   }
 
@@ -344,7 +344,7 @@ public class Dstore {
   }
 
   public static void setPort(int port){
-    Dstore.currentPort = port;
+    Dstore.port = port;
   }
 
   public static String getCurrentFolder() {
