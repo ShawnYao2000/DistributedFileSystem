@@ -40,9 +40,9 @@ class DStoreHandler {
         Controller.filesDStores.put(fileName, Controller.filesDStores.get(fileName));
       }
       index.fileStats.remove(fileName);
-      index.fileStats.put(fileName, Protocol.STORE_COMPLETE); //index updated to "store complete"
+      index.fileStats.put(fileName, Token.STORE_COMPLETE); //index updated to "store complete"
       DSHandlerLogger.info("Index updated to \"Store complete\"!");
-      printWriter.println(Protocol.STORE_COMPLETE_TOKEN);
+      printWriter.println(Token.STORE_COMPLETE_TOKEN);
       DSHandlerLogger.info("File [" + fileName + "] has been stored in DStores");
     } else {
       Controller.setCompletedStores(Controller.getCompletedStores()+1);
@@ -70,7 +70,7 @@ class DStoreHandler {
       Controller.filesDStores.remove(fileName);
 
       index.fileStats.remove(fileName);
-      index.fileStats.put(fileName, Protocol.REMOVE_COMPLETE); //index updated to "remove complete"
+      index.fileStats.put(fileName, Token.REMOVE_COMPLETE); //index updated to "remove complete"
       DSHandlerLogger.info("Index updated to \"Remove complete\"!");
       printWriter.println("REMOVE_COMPLETE");
       DSHandlerLogger.info("Remove completed!");

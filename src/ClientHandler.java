@@ -1,18 +1,11 @@
 import java.io.PrintWriter;
-import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 class ClientHandler {
   private static Index index;
   static Logger handlerLogger = Logger.getLogger(ClientHandler.class.getName());
+  private static int lastUsedDStoreIndex = 0;
 
   /**
    * This class handles message from clients
@@ -46,27 +39,58 @@ class ClientHandler {
    * @param printWriter
    * @param r
    * @param fileName
-   * @param fileSize
+   * @param param
    */
-  public synchronized static void handleStoreRequest(PrintWriter printWriter, int r, String fileName, int fileSize){
+  public synchronized static void handleStoreRequest(PrintWriter printWriter, int r, String fileName, int param) {
     if(index.fileStats.containsKey(fileName) && index.files.contains(fileName)){
-      printWriter.println(Protocol.ERROR_FILE_ALREADY_EXISTS_TOKEN);
+      printWriter.println(Token.ERROR_FILE_ALREADY_EXISTS_TOKEN);
       handlerLogger.info("File [" + fileName + "] already exists");
     } else {
       ArrayList<Integer> id = new ArrayList<>();
-      id.add(fileSize);
+      id.add(param);
       Controller.filesDStores.put(fileName, id);
       System.out.println(Controller.filesDStores);
-      index.fileStats.put(fileName, Protocol.STORE_IN_PROGRESS); //index updated to "store in progress"
+      index.fileStats.put(fileName, Token.STORE_IN_PROGRESS); //index updated to "store in progress"
       handlerLogger.info("Index updated to \"Store in progress\"!");
       String ports = "";
+
+      // Loop to select r DStores
       for (int i = 0; i < r; i++) {
-        ports += " " + Controller.dStoreList.get(i);
+        // Use modulo operation to ensure the index stays within the bounds of the DStore list
+        int dStoreIndex = (lastUsedDStoreIndex + i) % Controller.dStoreList.size();
+        ports += " " + Controller.dStoreList.get(dStoreIndex);
       }
-      printWriter.println(Protocol.STORE_TO_TOKEN + ports);
+
+      // Update last used DStore index
+      lastUsedDStoreIndex = (lastUsedDStoreIndex + r) % Controller.dStoreList.size();
+
+      printWriter.println(Token.STORE_TO_TOKEN + ports);
       handlerLogger.info("Store request sent to DStores at ports[" + ports +"]");
     }
   }
+
+
+  /**
+   * handles remove request from client
+   * @param clientPrintWriter
+   * @param fileName
+   */
+  public synchronized static void handleRemoveRequest(PrintWriter clientPrintWriter, String fileName){
+    System.out.println("Removing file [" + fileName + "]");
+    if(index.files.contains(fileName)) {
+      index.fileStats.remove(fileName);
+      index.files.remove(fileName);
+      index.fileStats.put(fileName, Token.REMOVE_IN_PROGRESS); //remove in progress
+      handlerLogger.info("Index updated to \"Remove in progress\"");
+      if (Controller.filesDStores.containsKey(fileName)) {
+        Controller.sendRemoveRequest(fileName);
+      }
+    } else {
+      clientPrintWriter.println("ERROR_FILE_DOES_NOT_EXIST");
+      handlerLogger.info("File [" + fileName + "] does not exist");
+    }
+  }
+
 
   /**
    * handles load request from client
@@ -84,27 +108,6 @@ class ClientHandler {
       } else {
         handlerLogger.info("File [" + fileName + "] does not exist in DStores");
       }
-    }
-  }
-
-  /**
-   * handles remove request from client
-   * @param clientPrintWriter
-   * @param fileName
-   */
-  public synchronized static void handleRemoveRequest(PrintWriter clientPrintWriter, String fileName){
-    System.out.println("Removing file [" + fileName + "]");
-    if(index.files.contains(fileName)) {
-      index.fileStats.remove(fileName);
-      index.files.remove(fileName);
-      index.fileStats.put(fileName, Protocol.REMOVE_IN_PROGRESS); //remove in progress
-      handlerLogger.info("Index updated to \"Remove in progress\"");
-      if (Controller.filesDStores.containsKey(fileName)) {
-        Controller.sendRemoveRequest(fileName);
-      }
-    } else {
-      clientPrintWriter.println("ERROR_FILE_DOES_NOT_EXIST");
-      handlerLogger.info("File [" + fileName + "] does not exist");
     }
   }
 }

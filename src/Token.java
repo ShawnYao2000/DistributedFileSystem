@@ -1,5 +1,5 @@
 
-public class Protocol {
+public class Token {
 
 	// messages sent by Clients
 	public final static String LIST_TOKEN = "LIST"; // also from Controller and Dstores

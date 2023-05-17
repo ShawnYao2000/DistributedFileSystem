@@ -56,39 +56,39 @@ public class Dstore {
                   String[] commands = line.split(" ");
                   switch (commands[0]) {
 
-                    case Protocol.STORE_TOKEN:
+                    case Token.STORE_TOKEN:
                       dStoreLogger.info("[" + port + "] <- " + "[" + cport + "] : STORE " + commands[1] + " | size:" + commands[2]);
                       storeReq(printWriter, commands[1], Integer.parseInt(commands[2]));
                       client.setSoTimeout(timeout);
                       receiveFile(controllerPrintWriter, client.getInputStream(), currentFileSize, true);
                       break;
 
-                    case Protocol.REBALANCE_STORE_TOKEN:
+                    case Token.REBALANCE_STORE_TOKEN:
                       dStoreLogger.info("[" + port + "] <- " + "[" + cport + "] : REBALANCE_STORE " + commands[1] + " | size:" + commands[2]);
                       storeReq(printWriter, commands[1], Integer.parseInt(commands[2]));
                       receiveFile(printWriter, client.getInputStream(), currentFileSize, false);
                       break;
 
-                    case Protocol.REMOVE_TOKEN:
+                    case Token.REMOVE_TOKEN:
                       dStoreLogger.info("[" + port + "] <- " + "[" + cport + "] : REMOVE " + commands[1]);
                       removeFile(controllerPrintWriter, commands[1]);
                       break;
 
-                    case Protocol.LOAD_DATA_TOKEN:
+                    case Token.LOAD_DATA_TOKEN:
                       dStoreLogger.info("[" + port + "] <- " + "[" + cport + "] : LOAD_DATA " + commands[1]);
                       loadFile(commands[1], clientWriter);
                       break;
 
-                    case Protocol.LIST_TOKEN:
+                    case Token.LIST_TOKEN:
                       dStoreLogger.info("[" + port + "] <- " + "[" + cport + "] : LIST");
                       listFile(controllerPrintWriter);
                       break;
-                    case Protocol.REBALANCE_TOKEN:
-                      dStoreLogger.info("[" + port + "] <- " + "[" + cport + "] : REBALANCE " + commands[1]);
+                    case Token.REBALANCE_TOKEN:
+                      dStoreLogger.info("[" + port + "] <- " + "[" + cport + "] : REBALANCE ");
                       String remainingRebalance = line.split(" ", 2)[1];
                       rebalance(controllerPrintWriter, remainingRebalance);
                       break;
-                    case Protocol.ACK_TOKEN:
+                    case Token.ACK_TOKEN:
                       dStoreLogger.info("[" + port + "] <- " + "[" + cport + "] : ACK");
                       writeFileContent(clientWriter);
                       break;
@@ -152,7 +152,7 @@ public class Dstore {
     try {
       currentFileName = fileName;
       currentFileSize = fileSize;
-      printWriter.println(Protocol.ACK_TOKEN);
+      printWriter.println(Token.ACK_TOKEN);
       dStoreLogger.info("ACK -> " + "[" + cport + "]");
     } catch (Exception e) {
       dStoreLogger.info("Error sending ACK");
@@ -278,7 +278,7 @@ public class Dstore {
     for(int i = 1; i <= removed; i++){
       remove(contents[reCounter+i]);
     }
-    toController.println(Protocol.REBALANCE_COMPLETE_TOKEN);
+    toController.println(Token.REBALANCE_COMPLETE_TOKEN);
     dStoreLogger.info("REBALANCE_COMPLETE -> " + "[" + cport + "]");
   }
 

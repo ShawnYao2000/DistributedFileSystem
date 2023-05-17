@@ -1,6 +1,5 @@
 
 import java.io.*;
-import java.lang.System.Logger.Level;
 import java.net.*;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -12,8 +11,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Controller class for the Distributed File System
@@ -27,9 +24,8 @@ class Controller {
 
   static Index index = new Index(new ArrayList<>(), new HashMap<>());
   static ArrayList<Integer> dStoreList = new ArrayList<>();
-  static Map<Integer,Socket> dstorePortsSocket;
+  static Map<Integer,Socket> dstorePortsSocket = new HashMap<>();
   static HashMap<String, ArrayList<Integer>> filesDStores = new HashMap<>();
-
   static HashMap<String, PrintWriter> storePrintWriter = new HashMap<>();
   static HashMap<String, PrintWriter> removeFilePW = new HashMap<>();
 
@@ -38,12 +34,10 @@ class Controller {
   static int rebalanceCounter = 0;
   static boolean rebalancing = false;
   static int totalRebalance = 0;
-
   static int rebalanceCompleteCounter = 0;
   static int storeComplete = 0;
   static int deleteComplete = 0;
   static int loadedPorts = 0;
-
   static int r = 0;
   static int cPort = 0;
 
@@ -69,7 +63,7 @@ class Controller {
     updateHandlerIndex(index);
     dStoreList.clear();
 
-    rebalanceTimer(rebalanceTime); //TODO: try to use thread.sleep instead
+    rebalanceTimer(rebalanceTime); //TODO: try to use thread.sleep instead?
 
     ClientHandler clientHandler = new ClientHandler(index);
     DStoreHandler dStoreHandler = new DStoreHandler(index);
@@ -98,15 +92,15 @@ class Controller {
                   String finalLine = line;
                   Callable<Void> callable = () -> {
                     switch (command) {
-                      case Protocol.JOIN_TOKEN:
+                      case Token.JOIN_TOKEN:
                         fromDStore.set(true);
                         currentPort.set(Integer.parseInt(contents[1]));
                         controllerLogger.info("Dstore ["+currentPort+"]" + " joined");
                         joinDS(contents[1]);
-                        //rebalance();
+                        handleJoinRequest(client, finalLine);
+                        //rebalance();//TODO: test
                         break;
-                        //DS STARTS WITH JOIN?
-                        //TODO: CHECK SPEC
+
                       case "LIST":
                         if (fromDStore.get()) {
                           rebalanceCounter++;
@@ -121,12 +115,12 @@ class Controller {
                             clientHandler.handleListRequest(out);
                             controllerLogger.info("LIST" + " <- [" + cport + "]");
                           } else {
-                            controllerLogger.info(Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
+                            controllerLogger.info(Token.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
                           }
                         }
                         break;
 
-                      case Protocol.STORE_TOKEN:
+                      case Token.STORE_TOKEN:
                         if(sufficientDS(out)) {
                           if(!index.fileStats.containsKey(contents[1])) {
                             storePrintWriter.put(contents[1], out);
@@ -136,18 +130,18 @@ class Controller {
                           controllerLogger.info("STORE" + " <- [" + cport + "]");
                           controllerLogger.info("File: " + contents[1] + " already exists in map.");//not sure if this will occur
                         } else {
-                          controllerLogger.info(Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
+                          controllerLogger.info(Token.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
                         }
                         break;
 
-                      case Protocol.STORE_ACK_TOKEN:
-                        if (index.fileStats.get(contents[1]) == Protocol.STORE_IN_PROGRESS) {
+                      case Token.STORE_ACK_TOKEN:
+                        if (index.fileStats.get(contents[1]) == Token.STORE_IN_PROGRESS) {
                           controllerLogger.info("STORE_ACK" + " <- [" + cport + "]");
                           dStoreHandler.handleStoreComplete(currentPort.get(), storePrintWriter.get(contents[1]), getCompletedStores() + 1, contents[1]);
                         }
                         break;
 
-                      case Protocol.LOAD_TOKEN:
+                      case Token.LOAD_TOKEN:
                         if (sufficientDS(out)) {
                           if(index.files.contains(contents[1])) {
                             setLoadedPorts(1);
@@ -155,39 +149,41 @@ class Controller {
                             controllerLogger.info("LOAD" + " <- [" + cport + "]");
                             controllerLogger.info("Loading file: [" + contents[1] +"]");
                           } else {
-                            out.println(Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
-                            controllerLogger.info(Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN + " -> [" + cport + "]");
+                            out.println(Token.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+                            controllerLogger.info(
+                                Token.ERROR_FILE_DOES_NOT_EXIST_TOKEN + " -> [" + cport + "]");
                           }
                         }
                         break;
 
-                      case Protocol.RELOAD_TOKEN:
+                      case Token.RELOAD_TOKEN:
                         if (getLoadedPorts() == filesDStores.get(contents[1]).size()-1) {
-                          out.println(Protocol.ERROR_LOAD_TOKEN);
+                          out.println(Token.ERROR_LOAD_TOKEN);
                         } else if (sufficientDS(out)){
                           if(index.files.contains(contents[1])) {
                             setLoadedPorts(getLoadedPorts()+1);
                             clientHandler.handleLoadRequest(out, contents[1], getLoadedPorts());
                           } else {
-                            out.println(Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
-                            controllerLogger.info(Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN + " -> [" + cport + "]");
+                            out.println(Token.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+                            controllerLogger.info(
+                                Token.ERROR_FILE_DOES_NOT_EXIST_TOKEN + " -> [" + cport + "]");
                           }
                         }
                         break;
 
-                      case Protocol.REMOVE_TOKEN:
+                      case Token.REMOVE_TOKEN:
                         if (sufficientDS(out) && index.files.contains(contents[1])){
                           System.out.println("IM REMOVING HERE!!!!");
                           removeFilePW.put(contents[1], out);
                           clientHandler.handleRemoveRequest(out, contents[1]);
                         } else {
-                          out.println(Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+                          out.println(Token.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
                           ArrayList<Integer> dStores = Controller.filesDStores.get(contents[1]);
                           for (int i = 1; i < dStores.size(); i++) {
                             try {
                               Socket ds = new Socket(InetAddress.getLoopbackAddress(), dStores.get(i));
                               PrintWriter dStorePW = new PrintWriter(ds.getOutputStream(), true);
-                              dStorePW.println(Protocol.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
+                              dStorePW.println(Token.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
                             } catch (IOException e) {
                               e.printStackTrace();
                               controllerLogger.info("Error sending message to DStore [" + dStores.get(i) + "]");
@@ -196,15 +192,15 @@ class Controller {
                         }
                         break;
 
-                      case Protocol.REMOVE_ACK_TOKEN:
-                        if (index.fileStats.get(contents[1]) == Protocol.REMOVE_IN_PROGRESS && sufficientDS(out)){
+                      case Token.REMOVE_ACK_TOKEN:
+                        if (index.fileStats.get(contents[1]) == Token.REMOVE_IN_PROGRESS && sufficientDS(out)){
                           dStoreHandler.handleRemoveComplete(currentPort.get(), removeFilePW.get(contents[1]), getDeleteComplete() + 1, contents[1]);
                         } else {
                           System.out.println("!!!REMOVE FAILED!!!!");
                         }
                         break;
 
-                      case Protocol.REBALANCE_COMPLETE_TOKEN:
+                      case Token.REBALANCE_COMPLETE_TOKEN:
                         out.println("LIST");
                         setRebalanceCompleteCounter(getRebalanceCompleteCounter()-1);
                         if(getRebalanceCompleteCounter() == 0){
@@ -235,7 +231,7 @@ class Controller {
 
               } catch (SocketException e) {
                 controllerLogger.info("DStore [" + currentPort + "] has failed");
-                recoverDS(currentPort.get());
+                //recoverDS(currentPort.get());//TODO: CHECK
               } catch (IOException e) {
                 e.printStackTrace();
                 controllerLogger.info("Unexpected error occurred" + e);
@@ -252,13 +248,131 @@ class Controller {
   }
 
   /**
+   * timer for rebalance
+   * runs every:
+   * @param time
+   */
+  private synchronized static void rebalanceTimer(int time){
+    Timer timer = new Timer();
+    timer.scheduleAtFixedRate(new TimerTask() {
+      @Override
+      public void run() {
+        try{
+          rebalance();
+        }
+        catch (Exception e){
+          controllerLogger.info("rebalance time out");
+        }
+      }
+    }, time, time);
+  }
+
+  synchronized static void rebalance() {
+    // Check if a rebalance operation is already running
+    if (rebalancing) {
+      controllerLogger.info("A rebalance operation is already running.");
+      return;
+    }
+
+    // Check if there are any pending STORE or REMOVE operations
+    if (storeComplete < r || deleteComplete < r) {
+      controllerLogger.info("Waiting for pending STORE or REMOVE operations to complete.");
+      return;
+    }
+
+    // Set the rebalancing flag to true
+    rebalancing = true;
+
+    // Queue all client requests
+    // TODO: Implement this based on your system's design
+
+    // Calculate the number of files each DStore should store
+    int F = index.files.size();
+    int N = dStoreList.size();
+    int lowerBound = (r * F) / N;
+    int upperBound = (int) Math.ceil((double) (r * F) / N);
+
+    // For each DStore, get the list of files
+    for (Integer port : dStoreList) {
+      Socket dStoreSocket = dstorePortsSocket.get(port);
+      try {
+        PrintWriter out = new PrintWriter(dStoreSocket.getOutputStream(), true);
+        out.println(Token.LIST_TOKEN);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+
+    // TODO: Wait for LIST responses and update the index and filesDStores maps
+
+    // For each DStore, calculate the files to send and remove
+    for (Integer port : dStoreList) {
+      ArrayList<String> filesToSend = new ArrayList<>();
+      ArrayList<String> filesToRemove = new ArrayList<>();
+
+      // Get the list of files currently stored in this DStore
+      ArrayList<String> currentFiles = new ArrayList<>();
+      for (Map.Entry<String, ArrayList<Integer>> entry : filesDStores.entrySet()) {
+        if (entry.getValue().contains(port)) {
+          currentFiles.add(entry.getKey());
+        }
+      }
+
+      // If the DStore has more files than the upper bound, remove some files
+      while (currentFiles.size() > upperBound) {
+        String fileToRemove = currentFiles.remove(currentFiles.size() - 1);
+        filesToRemove.add(fileToRemove);
+        index.files.remove(fileToRemove);
+        filesDStores.get(fileToRemove).remove(port);
+      }
+
+      // If the DStore has fewer files than the lower bound, add some files
+      while (currentFiles.size() < lowerBound) {
+        for (String file : index.files) {
+          if (!currentFiles.contains(file)) {
+            currentFiles.add(file);
+            filesToSend.add(file);
+            filesDStores.get(file).add(port);
+            break;
+          }
+        }
+      }
+
+      // Send the REBALANCE command to the DStore
+      Socket dStoreSocket = dstorePortsSocket.get(port);
+      try {
+        PrintWriter out = new PrintWriter(dStoreSocket.getOutputStream(), true);
+        out.println(Token.REBALANCE_TOKEN + " " + filesToSend.size() + " " + String.join(" ", filesToSend) + " " + filesToRemove.size() + " " + String.join(" ", filesToRemove));
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+
+    // Reset the rebalancing flag
+    rebalancing = false;
+  }
+
+
+  private synchronized static void handleJoinRequest(Socket socket, String command){
+    String[] param = command.split(" ");
+    try {
+      int port = Integer.parseInt(param[1]);
+        dstorePortsSocket.put(port,socket);
+      System.out.println("Putting port "+port+" in dstorePortsSocket");
+      } catch (NumberFormatException e) {
+      System.out.println("INVALID PARAMETER");
+    }
+  }
+
+
+  /**
    * Check if there are enough DStores to handle the request
    * @param printWriter
    * @return
    */
   private synchronized static boolean sufficientDS(PrintWriter printWriter){
     if(dStoreList.size() < r){
-      printWriter.println(Protocol.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
+      printWriter.println(Token.ERROR_NOT_ENOUGH_DSTORES_TOKEN);
       return false;
     } else {
       return true;
@@ -283,40 +397,6 @@ class Controller {
         controllerLogger.info("Error adding DStore [" + port + "]");
       }
     }
-  }
-
-  /**
-   * timer for rebalance
-   * runs every:
-   * @param time
-   */
-  private synchronized static void rebalanceTimer(int time){
-    Timer timer = new Timer();
-    timer.scheduleAtFixedRate(new TimerTask() {
-      @Override
-      public void run() {
-        try{
-          //rebalance();
-        }
-        catch (Exception e){
-          controllerLogger.info("rebalance time out");
-        }
-      }
-    }, time, time);
-  }
-
-  /**
-   * main rebalance method, calls invokelist() and set rebalancing to true
-   */
-  private synchronized static void rebalance(){
-    recoverIndex();
-    if(!dStoreList.isEmpty()){
-      rebalancing = true;
-      controllerLogger.info("Rebalance invoked...");
-    } else {
-      controllerLogger.info("No DStores to rebalance");
-    }
-    invokeList();// invoke anyway?
   }
 
   /**
@@ -349,280 +429,7 @@ class Controller {
     if (rebalanceCounter >= dStoreList.size()) {
       controllerLogger.info("Index updated!");
       controllerLogger.info("Rebalancing...");
-      //cycleRebalance();
-      //calcRebalance();
     }
-  }
-
-  /**
-   * fill in the filesList
-   */
-  private synchronized static void recoverIndex(){
-    for(String key : filesDStores.keySet()) {
-      int size = filesDStores.get(key).get(0);
-      filesDStores.get(key).clear();
-      filesDStores.get(key).add(size);
-    }
-  }
-
-  /**
-   * rebalance calculation
-   * TODO: TRY TO SHORTEN THIS
-   */
-  private synchronized static void calcRebalance() {
-    String minFile;
-    Integer minDStore;
-    String maxFile;
-    Integer maxDStore;
-
-    HashMap<Integer, ArrayList<String>> dStoreHM = getDStores();
-
-    Double minRep = Math.floor(Double.valueOf(r * filesDStores.size()) / Double.valueOf(dStoreList.size()));
-    Double maxRep = Math.ceil(Double.valueOf(r * filesDStores.size()) / Double.valueOf(dStoreList.size()));
-
-    HashMap<String, ArrayList<Integer>> toSend = new HashMap<>();
-    HashMap<Integer, ArrayList<String>> toStore = new HashMap<>();
-    HashMap<Integer, ArrayList<String>> toDelete = deleteFailedFiles(index.fileStats);
-
-    while (!isFinished(dStoreHM, r, minRep, maxRep)) {
-      int index = 0;
-      minDStore = getMinDStore(dStoreHM);
-      maxDStore = getMaxDStore(dStoreHM);
-      minFile = getMinFile(index, dStoreHM);
-      maxFile = getMaxFile(dStoreHM, maxDStore);
-
-      while (!isOptimal(minDStore, maxDStore, minFile, maxFile, minRep, maxRep, dStoreHM)) {
-        if (dStoreHM.get(minDStore).contains(minFile)) {
-          index++;
-          minFile = getMinFile(index, dStoreHM);
-        } else if (dStoreHM.get(maxDStore).contains(maxFile)) {
-          maxFile = getMaxFile(dStoreHM, maxDStore);
-        } else {
-          break;
-        }
-      }
-
-      if (!isOptimal(minDStore, maxDStore, minFile, maxFile, minRep, maxRep, dStoreHM)) {
-        continue;
-      }
-
-      dStoreHM.get(minDStore).add(minFile);
-      dStoreHM.get(maxDStore).remove(maxFile);
-
-      toStore.computeIfAbsent(minDStore, k -> new ArrayList<>()).add(minFile);
-      toDelete.computeIfAbsent(maxDStore, k -> new ArrayList<>()).add(maxFile);
-
-      ArrayList<Integer> sendList = toSend.computeIfAbsent(minFile, k -> new ArrayList<>());
-      if (!sendList.contains(minDStore)) {
-        sendList.add(minDStore);
-      }
-    }
-
-    preRebalance(toStore, toDelete, toSend);
-  }
-
-  /**
-   * just a helper to check if opti
-   * @param minDStore
-   * @param maxDStore
-   * @param minFile
-   * @param maxFile
-   * @param minRep
-   * @param maxRep
-   * @param dStoreHM
-   * @return if optimal
-   */
-  private static boolean isOptimal(Integer minDStore, Integer maxDStore, String minFile, String maxFile,
-      Double minRep, Double maxRep, HashMap<Integer, ArrayList<String>> dStoreHM) {
-    return dStoreHM.get(minDStore).size() < minRep && !dStoreHM.get(minDStore).contains(minFile)
-        && dStoreHM.get(maxDStore).size() > maxRep && dStoreHM.get(maxDStore).contains(maxFile);
-  }
-
-  /**
-   * remove the failed files, returns for sani
-   * @param statusHM
-   * @return
-   */
-  private synchronized static HashMap<Integer, ArrayList<String>> deleteFailedFiles(HashMap<String, Integer> statusHM) {
-    HashMap<Integer, ArrayList<String>> filesToRemove = new HashMap<>();
-    for (Map.Entry<String, Integer> entry : statusHM.entrySet()) {
-      String key = entry.getKey();
-      Integer status = entry.getValue();
-      if (status == Protocol.REMOVE_IN_PROGRESS) {
-        ArrayList<Integer> ports = filesDStores.get(key);
-        ports.remove(0);
-        for (Integer port : ports) {
-          filesToRemove.computeIfAbsent(port, k -> new ArrayList<>()).add(key);
-        }
-      }
-    }
-    return filesToRemove;
-  }
-
-
-  /**
-   * get dstores hash map
-   * @return
-   */
-  private synchronized static HashMap<Integer, ArrayList<String>> getDStores() {
-    index.files.removeIf(key -> index.fileStats.get(key) == Protocol.REMOVE_IN_PROGRESS);
-    filesDStores.keySet().removeAll(index.files);
-
-    HashMap<Integer, ArrayList<String>> dStoreHM = new HashMap<>();
-    for (String key : filesDStores.keySet()) {
-      ArrayList<Integer> ports = filesDStores.get(key);
-      for (int i = 1; i < ports.size(); i++) {
-        Integer port = ports.get(i);
-        dStoreHM.computeIfAbsent(port, k -> new ArrayList<>()).add(key);
-      }
-    }
-
-    for (Integer port : dStoreList) {
-      dStoreHM.putIfAbsent(port, new ArrayList<>());
-    }
-    return dStoreHM;
-  }
-
-  /**
-   * get the maximum ds
-   * @param dStoreHM
-   * @return
-   */
-  private static Integer getMinDStore(HashMap<Integer, ArrayList<String>> dStoreHM) {
-    return dStoreHM.entrySet().stream()
-        .min(Comparator.comparingInt(entry -> entry.getValue().size()))
-        .map(Map.Entry::getKey)
-        .orElse(1);
-  }
-
-  /**
-   * get the maximum dstores
-   * @param dStoreHM
-   * @return
-   */
-  private static Integer getMaxDStore(HashMap<Integer, ArrayList<String>> dStoreHM) {
-    return dStoreHM.entrySet().stream()
-        .max(Comparator.comparingInt(entry -> entry.getValue().size()))
-        .map(Map.Entry::getKey)
-        .orElse(1);
-  }
-
-  /**
-   * get the minimum file in the dStore
-   * @param skip
-   * @param hm
-   * @return
-   */
-  private static String getMinFile(Integer skip, HashMap<Integer, ArrayList<String>> hm) {
-    HashSet<String> filesSet = hm.values().stream().flatMap(Collection::stream).collect(Collectors.toCollection(HashSet::new));
-    HashMap<String, ArrayList<Integer>> invertedHM = fileToKeys(hm);
-    return IntStream.range(0, skip + 1)
-        .mapToObj(i -> {
-          String minFile = getMinFileAbs(filesSet, invertedHM);
-          filesSet.remove(minFile);
-          return minFile;
-        })
-        .skip(skip)
-        .findFirst()
-        .orElse("");
-  }
-
-  /**
-   * get the maximum file in the dStore
-   * @param hm
-   * @param maxDStore
-   * @return
-   */
-  private static String getMaxFile(HashMap<Integer, ArrayList<String>> hm, Integer maxDStore) {
-    ArrayList<String> fileArray = hm.get(maxDStore);
-    HashMap<String, ArrayList<Integer>> invertedHM = fileToKeys(hm);
-    return fileArray.stream()
-        .max(Comparator.comparingInt(key -> invertedHM.get(key).size()))
-        .orElse("");
-  }
-
-  /**
-   * get the minimum file in the dStore
-   * @param stringSet
-   * @param hm
-   * @return
-   */
-  private static String getMinFileAbs(Set<String> stringSet, HashMap<String, ArrayList<Integer>> hm) {
-    return stringSet.stream()
-        .min(Comparator.comparingInt(key -> hm.get(key).size()))
-        .orElse("");
-  }
-
-  /**
-   * convert the hashmap from key to file to file to key
-   * @param hm
-   * @return
-   */
-  private static HashMap<String, ArrayList<Integer>> fileToKeys(HashMap<Integer, ArrayList<String>> hm) {
-    HashMap<String, ArrayList<Integer>> converted = new HashMap<>();
-    hm.forEach((key, fileList) -> fileList.forEach(file -> converted.computeIfAbsent(file, k -> new ArrayList<>()).add(key)));
-    return converted;
-  }
-
-  /**
-   * check if the rebalance is finished
-   * @param dStoreHM
-   * @param rep_factor
-   * @param minRep
-   * @param maxRep
-   * @return
-   */
-  private static boolean isFinished(HashMap<Integer, ArrayList<String>> dStoreHM, Integer rep_factor, Double minRep, Double maxRep) {
-    HashMap<String, ArrayList<Integer>> fileHM = fileToKeys(dStoreHM);
-    return fileHM.values().stream().allMatch(list -> list.size() == rep_factor)
-        && dStoreHM.values().stream().allMatch(list -> list.size() >= minRep && list.size() <= maxRep);
-  }
-
-  /**
-   * This method is called when a rebalance is needed. It will send the files to the appropriate DStores.
-   * @param fileToStoreHM
-   * @param fileToRemoveHM
-   * @param fileToSendHM
-   */
-  private synchronized static void preRebalance(HashMap<Integer, ArrayList<String>> fileToStoreHM, HashMap<Integer, ArrayList<String>> fileToRemoveHM, HashMap<String, ArrayList<Integer>> fileToSendHM) {
-    if (!fileToStoreHM.isEmpty() || !fileToRemoveHM.isEmpty() || !fileToSendHM.isEmpty()) {
-      Map<Map.Entry<Integer, String>, List<Integer>> moveMap = fileToSendHM.entrySet().stream().collect(Collectors.toMap(
-          entry -> new AbstractMap.SimpleEntry<>(entry.getValue().get(0), entry.getKey()),
-          entry -> entry.getValue().subList(1, entry.getValue().size())));
-
-      setRebalanceCompleteCounter(0);
-      dStoreList.forEach(port -> {
-        String toMove = moveMap.entrySet().stream()
-            .filter(entry -> entry.getKey().getKey().equals(port))
-            .map(entry -> " " + entry.getKey().getValue() + " " + entry.getValue().size() + parsePorts((ArrayList<Integer>) entry.getValue()))
-            .collect(Collectors.joining());
-        toMove = moveMap.entrySet().stream().filter(entry -> entry.getKey().getKey().equals(port)).count() + toMove;
-        String filesToRemove = fileToRemoveHM.getOrDefault(port, new ArrayList<>()).stream()
-            .collect(Collectors.joining(" ", Integer.toString(fileToRemoveHM.getOrDefault(port, new ArrayList<>()).size()), ""));
-        rebalanceRequest(port, toMove, filesToRemove);
-      });
-    } else {
-      controllerLogger.info("No rebalance needed!");
-    }
-  }
-
-  /**
-   * recover a given ds
-   * @param port
-   */
-  private synchronized static void recoverDS(Integer port) {
-    if (port == 0) return;
-    dStoreList.remove(port);
-    filesDStores.entrySet().removeIf(entry -> {
-      entry.getValue().remove(port);
-      if (entry.getValue().size() == 1) {
-        index.files.remove(entry.getKey());
-        index.fileStats.remove(entry.getKey());
-        updateHandlerIndex(index);
-        return true;
-      }
-      return false;
-    });
   }
 
   /**
@@ -630,7 +437,7 @@ class Controller {
    */
   private synchronized static void postRebalanceRecover() {
     index.fileStats.entrySet().removeIf(entry -> {
-      if (entry.getValue() == Protocol.REMOVE_IN_PROGRESS) {
+      if (entry.getValue() == Token.REMOVE_IN_PROGRESS) {
         index.files.remove(entry.getKey());
         updateHandlerIndex(index);
         return true;
@@ -640,52 +447,23 @@ class Controller {
   }
 
 
-  /**
-   * converts arraylist of files to string
-   * @param filesList
-   * @return
-   */
-  private static String parseFiles(ArrayList<String> filesList) {
-    String output = "";
-    for (String file : filesList) {
-      output += " " + file;
-    }
-    return output;
-  }
-
-  /**
-   * converts arraylist of ports to string
-   * @param portsList
-   * @return
-   */
-  private static String parsePorts(ArrayList<Integer> portsList) {
-    String output = "";
-    for (Integer port : portsList) {
-      output += " " + port.toString();
-    }
-    return output;
-  }
-
-  /**
-   * sends rebalance request to dstore
-   * @param port
-   * @param files_to_send
-   * @param files_to_remove
-   */
-  private static void rebalanceRequest(Integer port, String files_to_send, String files_to_remove){
-    controllerLogger.info("REBALANCE " + files_to_send + " " + files_to_remove);
-    try {
-      Socket dStore = new Socket(InetAddress.getLoopbackAddress(), port);
-      PrintWriter toDStore = new PrintWriter(dStore.getOutputStream(), true);
-      toDStore.println("REBALANCE " + files_to_send + " " + files_to_remove);
-      setRebalanceCompleteCounter(getRebalanceCompleteCounter()+1);
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-  }
-
   public static void sendRemoveRequest(String fileName) {
     ArrayList<Integer> dStores = Controller.filesDStores.get(fileName);
+    for (int i = 1; i < dStores.size(); i++) {
+      try {
+        System.out.println("Sending REMOVE " + fileName + " to DStore [" + dStores.get(i) + "]");
+        Socket ds = dstorePortsSocket.get(dStores.get(i));
+        System.out.println("REMOVE PORT: " + ds.getPort() + ";Local Port" + ds.getLocalPort());
+        PrintWriter dStorePW = new PrintWriter(ds.getOutputStream());
+        dStorePW.println("REMOVE " + fileName);
+        dStorePW.flush();
+        controllerLogger.info("[" + ds.getLocalPort() + "]" + "->" + "[" + ds.getPort() + "]: REMOVE " + fileName);
+      } catch (Exception e) {
+        controllerLogger.info("Error removing file [" + fileName + "] from DStore [" + dStores.get(i) + "]");
+        e.printStackTrace();
+      }
+    }
+
     for (int i = 1; i < dStores.size(); i++) {
       try {
         Socket ds = new Socket(InetAddress.getLoopbackAddress(), dStores.get(i));
