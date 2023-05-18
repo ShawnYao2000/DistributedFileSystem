@@ -63,7 +63,7 @@ class Controller {
     updateHandlerIndex(index);
     dStoreList.clear();
 
-    rebalanceTimer(rebalanceTime); //TODO: try to use thread.sleep instead?
+    //rebalanceTimer(rebalanceTime); //TODO: try to use thread.sleep instead?
 
     ClientHandler clientHandler = new ClientHandler(index);
     DStoreHandler dStoreHandler = new DStoreHandler(index);
@@ -98,7 +98,7 @@ class Controller {
                         controllerLogger.info("Dstore ["+currentPort+"]" + " joined");
                         joinDS(contents[1]);
                         handleJoinRequest(client, finalLine);
-                        //rebalance();//TODO: test
+                        rebalance();//TODO: test
                         break;
 
                       case "LIST":
@@ -184,7 +184,7 @@ class Controller {
                               Socket ds = new Socket(InetAddress.getLoopbackAddress(), dStores.get(i));
                               PrintWriter dStorePW = new PrintWriter(ds.getOutputStream(), true);
                               dStorePW.println(Token.ERROR_FILE_DOES_NOT_EXIST_TOKEN);
-                            } catch (IOException e) {
+                            } catch (Exception e) {
                               e.printStackTrace();
                               controllerLogger.info("Error sending message to DStore [" + dStores.get(i) + "]");
                             }
@@ -267,24 +267,9 @@ class Controller {
     }, time, time);
   }
 
-  synchronized static void rebalance() {
-    // Check if a rebalance operation is already running
-    if (rebalancing) {
-      controllerLogger.info("A rebalance operation is already running.");
-      return;
-    }
+  private synchronized static void rebalance() {
 
-    // Check if there are any pending STORE or REMOVE operations
-    if (storeComplete < r || deleteComplete < r) {
-      controllerLogger.info("Waiting for pending STORE or REMOVE operations to complete.");
-      return;
-    }
-
-    // Set the rebalancing flag to true
-    rebalancing = true;
-
-    // Queue all client requests
-    // TODO: Implement this based on your system's design
+    controllerLogger.info("Starting rebalance operation.");
 
     // Calculate the number of files each DStore should store
     int F = index.files.size();
@@ -293,15 +278,7 @@ class Controller {
     int upperBound = (int) Math.ceil((double) (r * F) / N);
 
     // For each DStore, get the list of files
-    for (Integer port : dStoreList) {
-      Socket dStoreSocket = dstorePortsSocket.get(port);
-      try {
-        PrintWriter out = new PrintWriter(dStoreSocket.getOutputStream(), true);
-        out.println(Token.LIST_TOKEN);
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-    }
+    invokeList();
 
     // TODO: Wait for LIST responses and update the index and filesDStores maps
 
@@ -322,8 +299,6 @@ class Controller {
       while (currentFiles.size() > upperBound) {
         String fileToRemove = currentFiles.remove(currentFiles.size() - 1);
         filesToRemove.add(fileToRemove);
-        index.files.remove(fileToRemove);
-        filesDStores.get(fileToRemove).remove(port);
       }
 
       // If the DStore has fewer files than the lower bound, add some files
@@ -332,24 +307,24 @@ class Controller {
           if (!currentFiles.contains(file)) {
             currentFiles.add(file);
             filesToSend.add(file);
-            filesDStores.get(file).add(port);
             break;
           }
         }
       }
 
       // Send the REBALANCE command to the DStore
-      Socket dStoreSocket = dstorePortsSocket.get(port);
       try {
+        Socket dStoreSocket = new Socket(InetAddress.getLoopbackAddress(), port);
         PrintWriter out = new PrintWriter(dStoreSocket.getOutputStream(), true);
         out.println(Token.REBALANCE_TOKEN + " " + filesToSend.size() + " " + String.join(" ", filesToSend) + " " + filesToRemove.size() + " " + String.join(" ", filesToRemove));
+        controllerLogger.info("Rebalance message: [" +Token.REBALANCE_TOKEN + " " + filesToSend.size() + " " + String.join(" ", filesToSend) + " " + filesToRemove.size() + " " + String.join(" ", filesToRemove) + "] sent to DStore [" + port + "]");
       } catch (IOException e) {
         e.printStackTrace();
       }
     }
 
     // Reset the rebalancing flag
-    rebalancing = false;
+    controllerLogger.info("Rebalance operation complete.");
   }
 
 
@@ -358,7 +333,7 @@ class Controller {
     try {
       int port = Integer.parseInt(param[1]);
         dstorePortsSocket.put(port,socket);
-      System.out.println("Putting port "+port+" in dstorePortsSocket");
+        controllerLogger.info("Putting port "+port+" in dstorePortsSocket");
       } catch (NumberFormatException e) {
       System.out.println("INVALID PARAMETER");
     }
@@ -448,6 +423,8 @@ class Controller {
 
 
   public static void sendRemoveRequest(String fileName) {
+
+    //PSEUDO
     ArrayList<Integer> dStores = Controller.filesDStores.get(fileName);
     for (int i = 1; i < dStores.size(); i++) {
       try {
@@ -463,6 +440,7 @@ class Controller {
         e.printStackTrace();
       }
     }
+    //PSEUDO
 
     for (int i = 1; i < dStores.size(); i++) {
       try {

@@ -85,8 +85,7 @@ public class Dstore {
                       break;
                     case Token.REBALANCE_TOKEN:
                       dStoreLogger.info("[" + port + "] <- " + "[" + cport + "] : REBALANCE ");
-                      String remainingRebalance = line.split(" ", 2)[1];
-                      rebalance(controllerPrintWriter, remainingRebalance);
+                      //rebalance(controllerPrintWriter, line);
                       break;
                     case Token.ACK_TOKEN:
                       dStoreLogger.info("[" + port + "] <- " + "[" + cport + "] : ACK");
@@ -253,34 +252,6 @@ public class Dstore {
     dStoreLogger.info("LIST -> " + "[" + cport + "]");
   }
 
-  /**
-   * Rebalance method
-   * @param toController
-   * @param commands
-   */
-  private synchronized static void rebalance(PrintWriter toController, String commands){
-    String[] contents = commands.split(" ");
-    int moved = 0;
-    int counter = 1;
-    int numFiles = Integer.valueOf(contents[0]);
-    while(moved < numFiles){
-      String fileName = contents[counter];
-      int portsNum = Integer.valueOf(contents[counter+1]);
-      for(int i = 1; i <= portsNum; i++){
-        int port = Integer.valueOf(contents[counter+1+i]);
-        writeFile(port, fileName);
-      }
-      moved++;
-      counter = counter + portsNum + 2;
-    }
-    int reCounter = counter;
-    int removed = Integer.valueOf(contents[reCounter]);
-    for(int i = 1; i <= removed; i++){
-      remove(contents[reCounter+i]);
-    }
-    toController.println(Token.REBALANCE_COMPLETE_TOKEN);
-    dStoreLogger.info("REBALANCE_COMPLETE -> " + "[" + cport + "]");
-  }
 
   /**
    * handles rebalance when file is removed
