@@ -63,7 +63,7 @@ class Controller {
     updateHandlerIndex(index);
     dStoreList.clear();
 
-    //rebalanceTimer(rebalanceTime); //TODO: try to use thread.sleep instead?
+    rebalanceTimer(rebalanceTime); //TODO: try to use thread.sleep instead?
 
     ClientHandler clientHandler = new ClientHandler(index);
     DStoreHandler dStoreHandler = new DStoreHandler(index);
@@ -422,7 +422,7 @@ class Controller {
   }
 
 
-  public static void sendRemoveRequest(String fileName) {
+  public synchronized static void sendRemoveRequest(String fileName) {
 
     //PSEUDO
     ArrayList<Integer> dStores = Controller.filesDStores.get(fileName);
